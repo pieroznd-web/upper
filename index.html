@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>PSQI 3D</title>
 
@@ -43,10 +43,6 @@ canvas {
 import * as THREE from 'three';
 
 
-/* =========================
-   CONFIGURAÇÃO
-========================= */
-
 const PLY_URL =
 './2026-08-05_100_026-UpperJaw.ply';
 
@@ -55,7 +51,7 @@ const TEXTURE_URL =
 
 
 /* =========================
-   THREE.JS
+   CENA
 ========================= */
 
 const scene = new THREE.Scene();
@@ -92,51 +88,50 @@ document
 
 
 /* =========================
-   LUZ
+   ILUMINAÇÃO
 ========================= */
 
 scene.add(
-    new THREE.HemisphereLight(
+    new THREE.AmbientLight(
         0xffffff,
-        0x777777,
-        2.2
+        1.8
     )
 );
 
-const frontal =
+const luz1 =
     new THREE.DirectionalLight(
         0xffffff,
-        2.5
+        2.2
     );
 
-frontal.position.set(0, 5, 10);
+luz1.position.set(5, 5, 10);
 
-scene.add(frontal);
+scene.add(luz1);
 
 
-const lateral =
+const luz2 =
     new THREE.DirectionalLight(
         0xffffff,
-        1.5
+        1.2
     );
 
-lateral.position.set(-5, 1, 4);
+luz2.position.set(-5, 2, 5);
 
-scene.add(lateral);
+scene.add(luz2);
 
 
 /* =========================
-   LEITURA DO PLY
+   CARREGAR PLY
 ========================= */
 
-async function carregarPLY() {
+async function carregarModelo() {
 
     const response =
         await fetch(PLY_URL);
 
     if (!response.ok) {
         throw new Error(
-            'Não foi possível carregar o PLY'
+            'Erro ao carregar PLY'
         );
     }
 
@@ -146,116 +141,69 @@ async function carregarPLY() {
     const bytes =
         new Uint8Array(buffer);
 
-    /*
-       Localiza "end_header"
-    */
+
+    /* Encontrar final do cabeçalho */
 
     const decoder =
         new TextDecoder('ascii');
 
     const inicio =
         decoder.decode(
-            bytes.subarray(
-                0,
-                Math.min(bytes.length, 10000)
-            )
+            bytes.subarray(0, 5000)
         );
 
-    const marcador =
-        'end_header';
+    const end =
+        inicio.indexOf('end_header');
 
-    const pos =
-        inicio.indexOf(marcador);
-
-    if (pos === -1) {
+    if (end === -1) {
         throw new Error(
-            'Cabeçalho PLY não encontrado'
+            'Cabeçalho PLY inválido'
         );
     }
 
 
-    /*
-       Descobre exatamente onde
-       começa o conteúdo binário
-    */
-
-    let dataStart =
-        pos + marcador.length;
+    let offset =
+        end + 'end_header'.length;
 
     while (
-        bytes[dataStart] === 10 ||
-        bytes[dataStart] === 13
+        bytes[offset] === 10 ||
+        bytes[offset] === 13
     ) {
-        dataStart++;
+        offset++;
     }
-
-
-    const header =
-        inicio.substring(
-            0,
-            pos + marcador.length
-        );
-
-
-    console.log(header);
-
-
-    /*
-       Quantidade de vértices e faces
-    */
-
-    const vertexMatch =
-        header.match(
-            /element vertex\s+(\d+)/
-        );
-
-    const faceMatch =
-        header.match(
-            /element face\s+(\d+)/
-        );
-
-    if (!vertexMatch || !faceMatch) {
-        throw new Error(
-            'Vértices ou faces não encontrados'
-        );
-    }
-
-    const vertexCount =
-        parseInt(vertexMatch[1]);
-
-    const faceCount =
-        parseInt(faceMatch[1]);
-
-
-    console.log(
-        'Vértices:',
-        vertexCount
-    );
-
-    console.log(
-        'Faces:',
-        faceCount
-    );
 
 
     const view =
         new DataView(buffer);
 
-    let offset =
-        dataStart;
+
+    /* =========================
+       DADOS REAIS DO SEU PLY
+    ========================= */
+
+    const vertexCount = 222148;
+    const faceCount   = 438731;
 
 
     /*
-       Vértices
+       Cada vértice possui:
 
-       Seu arquivo possui:
-       x float
-       y float
-       z float
+       x
+       y
+       z
+       nx
+       ny
+       nz
+
+       6 floats = 24 bytes
     */
 
+
     const vertices =
-        new Array(vertexCount);
+        new Float32Array(
+            vertexCount * 3
+        );
+
 
     for (
         let i = 0;
@@ -263,7 +211,12 @@ async function carregarPLY() {
         i++
     ) {
 
-        const x =
+        const base = i * 3;
+
+
+        /* XYZ */
+
+        vertices[base] =
             view.getFloat32(
                 offset,
                 true
@@ -271,7 +224,8 @@ async function carregarPLY() {
 
         offset += 4;
 
-        const y =
+
+        vertices[base + 1] =
             view.getFloat32(
                 offset,
                 true
@@ -279,7 +233,8 @@ async function carregarPLY() {
 
         offset += 4;
 
-        const z =
+
+        vertices[base + 2] =
             view.getFloat32(
                 offset,
                 true
@@ -287,25 +242,46 @@ async function carregarPLY() {
 
         offset += 4;
 
-        vertices[i] = [x,y,z];
+
+        /*
+           NX NY NZ
+
+           Precisamos avançar 12 bytes.
+           Não precisamos armazená-los,
+           pois recalcularemos as normais.
+        */
+
+        offset += 12;
     }
 
 
+    /* =========================
+       TRIÂNGULOS + UV
+    ========================= */
+
+
     /*
-       Agora lemos cada face.
+       Seu arquivo possui aproximadamente
+       438 mil triângulos.
 
-       Estrutura:
-
-       uchar quantidade índices
-       int índices...
-
-       uchar quantidade texcoords
-       float texcoords...
+       Já reservamos a memória.
     */
 
+    const positions =
+        new Float32Array(
+            faceCount * 9
+        );
 
-    const positions = [];
-    const uvs = [];
+    const uvs =
+        new Float32Array(
+            faceCount * 6
+        );
+
+
+    let positionPointer = 0;
+    let uvPointer = 0;
+
+    let triangulos = 0;
 
 
     for (
@@ -314,7 +290,7 @@ async function carregarPLY() {
         f++
     ) {
 
-        /* índices */
+        /* quantidade de vértices */
 
         const qtdIndices =
             view.getUint8(offset);
@@ -325,9 +301,9 @@ async function carregarPLY() {
         const indices = [];
 
         for (
-            let j = 0;
-            j < qtdIndices;
-            j++
+            let i = 0;
+            i < qtdIndices;
+            i++
         ) {
 
             indices.push(
@@ -341,9 +317,9 @@ async function carregarPLY() {
         }
 
 
-        /* coordenadas da textura */
+        /* quantidade de floats UV */
 
-        const qtdTexcoords =
+        const qtdUV =
             view.getUint8(offset);
 
         offset += 1;
@@ -352,9 +328,9 @@ async function carregarPLY() {
         const texcoords = [];
 
         for (
-            let j = 0;
-            j < qtdTexcoords;
-            j++
+            let i = 0;
+            i < qtdUV;
+            i++
         ) {
 
             texcoords.push(
@@ -369,44 +345,68 @@ async function carregarPLY() {
 
 
         /*
-           Normalmente:
-           3 vértices
-           6 valores UV
-
-           u1 v1
-           u2 v2
-           u3 v3
+           Nosso caso:
+           triângulo = 3 índices
+           UV = 6 floats
         */
 
         if (
             qtdIndices === 3 &&
-            texcoords.length >= 6
+            qtdUV >= 6
         ) {
 
             for (
-                let j = 0;
-                j < 3;
-                j++
+                let i = 0;
+                i < 3;
+                i++
             ) {
 
-                const v =
+                const vertexIndex =
+                    indices[i] * 3;
+
+
+                positions[
+                    positionPointer++
+                ] =
                     vertices[
-                        indices[j]
+                        vertexIndex
                     ];
 
-                positions.push(
-                    v[0],
-                    v[1],
-                    v[2]
-                );
+
+                positions[
+                    positionPointer++
+                ] =
+                    vertices[
+                        vertexIndex + 1
+                    ];
 
 
-                uvs.push(
-                    texcoords[j * 2],
-                    texcoords[j * 2 + 1]
-                );
+                positions[
+                    positionPointer++
+                ] =
+                    vertices[
+                        vertexIndex + 2
+                    ];
+
+
+                uvs[
+                    uvPointer++
+                ] =
+                    texcoords[
+                        i * 2
+                    ];
+
+
+                uvs[
+                    uvPointer++
+                ] =
+                    texcoords[
+                        i * 2 + 1
+                    ];
 
             }
+
+            triangulos++;
 
         }
 
@@ -414,13 +414,13 @@ async function carregarPLY() {
 
 
     console.log(
-        'Triângulos processados:',
-        positions.length / 9
+        'Triângulos:',
+        triangulos
     );
 
 
     /* =========================
-       GEOMETRIA THREE.JS
+       GEOMETRIA
     ========================= */
 
     const geometry =
@@ -429,7 +429,7 @@ async function carregarPLY() {
 
     geometry.setAttribute(
         'position',
-        new THREE.Float32BufferAttribute(
+        new THREE.BufferAttribute(
             positions,
             3
         )
@@ -438,7 +438,7 @@ async function carregarPLY() {
 
     geometry.setAttribute(
         'uv',
-        new THREE.Float32BufferAttribute(
+        new THREE.BufferAttribute(
             uvs,
             2
         )
@@ -458,27 +458,26 @@ async function carregarPLY() {
 
     const texture =
         await new THREE.TextureLoader()
-            .loadAsync(TEXTURE_URL);
+        .loadAsync(TEXTURE_URL);
+
 
     texture.colorSpace =
         THREE.SRGBColorSpace;
 
 
     /*
-       IMPORTANTE
-
-       PLY e imagem utilizam
-       origem diferente no eixo Y.
+       MUITO IMPORTANTE
+       para esse tipo de PLY.
     */
 
     texture.flipY = false;
 
 
-    texture.minFilter =
-        THREE.LinearMipmapLinearFilter;
+    texture.wrapS =
+        THREE.ClampToEdgeWrapping;
 
-    texture.magFilter =
-        THREE.LinearFilter;
+    texture.wrapT =
+        THREE.ClampToEdgeWrapping;
 
 
     /* =========================
@@ -490,7 +489,7 @@ async function carregarPLY() {
 
             map: texture,
 
-            roughness: 0.75,
+            roughness: 0.8,
 
             metalness: 0,
 
@@ -510,15 +509,19 @@ async function carregarPLY() {
 
 
     /* =========================
-       ENQUADRAMENTO
+       CÂMERA
     ========================= */
 
-    geometry.computeBoundingBox();
+    const box =
+        new THREE.Box3()
+        .setFromObject(model);
+
 
     const size =
         new THREE.Vector3();
 
-    geometry.boundingBox.getSize(size);
+    box.getSize(size);
+
 
     const maxDim =
         Math.max(
@@ -531,8 +534,9 @@ async function carregarPLY() {
     camera.position.set(
         0,
         0,
-        maxDim * 1.9
+        maxDim * 1.8
     );
+
 
     camera.near =
         maxDim / 100;
@@ -545,16 +549,15 @@ async function carregarPLY() {
     camera.lookAt(0,0,0);
 
 
-    /*
-       Inclinação inicial
-    */
+    /* pequena inclinação */
 
     model.rotation.x =
-        THREE.MathUtils.degToRad(-10);
+        THREE.MathUtils
+        .degToRad(-10);
 
 
     /* =========================
-       ANIMAÇÃO
+       GIRAR SOZINHO
     ========================= */
 
     function animate() {
@@ -563,8 +566,10 @@ async function carregarPLY() {
             animate
         );
 
+
         model.rotation.y +=
             0.004;
+
 
         renderer.render(
             scene,
@@ -573,30 +578,31 @@ async function carregarPLY() {
 
     }
 
+
     animate();
 
 }
 
 
-/* =========================
-   INICIAR
-========================= */
+/* INICIAR */
 
-carregarPLY()
+carregarModelo()
+
 .catch(error => {
 
     console.error(error);
 
+    document.body.innerHTML +=
+        '<div style="color:red;position:absolute;top:20px;left:20px;font-family:Arial;">Erro ao carregar modelo 3D. Abra o console.</div>';
+
 });
 
 
-/* =========================
-   RESPONSIVO
-========================= */
+/* RESPONSIVO */
 
 window.addEventListener(
     'resize',
-    function() {
+    () => {
 
         camera.aspect =
             window.innerWidth /
