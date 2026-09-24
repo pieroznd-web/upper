@@ -23,15 +23,22 @@ body {
     background: transparent;
 }
 
+/* O canvas fica invisível enquanto o STL carrega */
 canvas {
     display: block;
     width: 100%;
     height: 100%;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+/* Só aparece quando tudo estiver pronto */
+canvas.pronto {
+    opacity: 1;
 }
 
 </style>
 </head>
-
 
 <body>
 
@@ -60,37 +67,37 @@ import {
 
 
 /* =====================================================
-   CONFIGURAÇÕES FÁCEIS DE ALTERAR
+   CONFIGURAÇÕES
 ===================================================== */
 
 
-/* velocidade da rotação */
+/* VELOCIDADE DO GIRO */
 
 const VELOCIDADE = 0.015;
 
 
 /*
-   ENQUADRAMENTO
+   TAMANHO / ENQUADRAMENTO
 
-   menor número = dente maior
-   maior número = dente menor
-
-   2.05 = quase rente
-   2.10 = pouco espaço
-   2.15 = recomendado
-   2.20 = mais espaço
-   2.30 = bastante espaço
+   menor = modelo maior
+   maior = modelo menor
 */
 
 const ENQUADRAMENTO = 2.15;
 
 
-/*
-   posição inicial da rotação
-   180 = lado oposto ao original
-*/
+/* POSIÇÃO INICIAL */
 
 const ANGULO_INICIAL = 180;
+
+
+
+/* =====================================================
+   ESTADO DO CARREGAMENTO
+===================================================== */
+
+let modeloCarregado = false;
+let animacaoIniciada = false;
 
 
 
@@ -110,8 +117,7 @@ const scene =
 const camera =
     new THREE.PerspectiveCamera(
         32,
-        window.innerWidth /
-        window.innerHeight,
+        window.innerWidth / window.innerHeight,
         0.1,
         10000
     );
@@ -124,49 +130,33 @@ const camera =
 
 const renderer =
     new THREE.WebGLRenderer({
-
         antialias: true,
-
         alpha: true
-
     });
 
 
 renderer.setPixelRatio(
-
     Math.min(
-
         window.devicePixelRatio,
-
         2
-
     )
-
 );
 
 
 renderer.setSize(
-
     window.innerWidth,
-
     window.innerHeight
-
 );
 
 
 renderer.setClearColor(
-
     0x000000,
-
     0
-
 );
 
 
 document.body.appendChild(
-
     renderer.domElement
-
 );
 
 
@@ -180,17 +170,12 @@ document.body.appendChild(
 
 const ambientLight =
     new THREE.AmbientLight(
-
         0xffffff,
-
         0.65
-
     );
 
 scene.add(
-
     ambientLight
-
 );
 
 
@@ -199,29 +184,18 @@ scene.add(
 
 const mainLight =
     new THREE.DirectionalLight(
-
         0xffffff,
-
         2.2
-
     );
 
-
 mainLight.position.set(
-
     4,
-
     6,
-
     8
-
 );
 
-
 scene.add(
-
     mainLight
-
 );
 
 
@@ -230,29 +204,18 @@ scene.add(
 
 const sideLight =
     new THREE.DirectionalLight(
-
         0xffffff,
-
         1.2
-
     );
 
-
 sideLight.position.set(
-
     -5,
-
     2,
-
     4
-
 );
 
-
 scene.add(
-
     sideLight
-
 );
 
 
@@ -261,87 +224,61 @@ scene.add(
 
 const fillLight =
     new THREE.DirectionalLight(
-
         0xffffff,
-
         0.7
-
     );
 
-
 fillLight.position.set(
-
     0,
-
     -5,
-
     3
-
 );
 
-
 scene.add(
-
     fillLight
-
 );
 
 
 
 /* =====================================================
-   GRUPO RESPONSÁVEL PELO GIRO
+   GRUPO DE ROTAÇÃO
 ===================================================== */
 
 const rotationGroup =
     new THREE.Group();
 
-
 scene.add(
-
     rotationGroup
-
 );
 
 
-/* posição inicial */
+/* começa exatamente no ângulo escolhido */
 
 rotationGroup.rotation.y =
-
     THREE.MathUtils.degToRad(
-
         ANGULO_INICIAL
-
     );
 
 
 
 /* =====================================================
-   GRUPO RESPONSÁVEL PELA ORIENTAÇÃO DO DENTE
+   ORIENTAÇÃO DO DENTE
 ===================================================== */
 
 const orientationGroup =
     new THREE.Group();
 
-
 rotationGroup.add(
-
     orientationGroup
-
 );
 
 
-/* orientação correta do STL */
-
 orientationGroup.rotation.x =
-
     THREE.MathUtils.degToRad(-90);
-
 
 orientationGroup.rotation.y = 0;
 
-
 orientationGroup.rotation.z =
-
     THREE.MathUtils.degToRad(180);
 
 
@@ -362,12 +299,12 @@ loader.load(
     function (geometry) {
 
 
-        /* melhora a iluminação da superfície */
+        /* superfície */
 
         geometry.computeVertexNormals();
 
 
-        /* coloca o modelo no centro */
+        /* centraliza o STL */
 
         geometry.center();
 
@@ -394,26 +331,20 @@ loader.load(
 
         const model =
             new THREE.Mesh(
-
                 geometry,
-
                 material
-
             );
 
 
         orientationGroup.add(
-
             model
-
         );
 
 
 
         /* =================================================
-           CALCULA O TAMANHO DO STL
+           CALCULA O TAMANHO DO MODELO
         ================================================= */
-
 
         geometry.computeBoundingBox();
 
@@ -423,48 +354,35 @@ loader.load(
 
 
         geometry.boundingBox.getSize(
-
             size
-
         );
 
 
         const maxDim =
             Math.max(
-
                 size.x,
-
                 size.y,
-
                 size.z
-
             );
 
 
 
         /* =================================================
-           ENQUADRAMENTO
+           POSICIONA A CÂMERA
         ================================================= */
 
-
         camera.position.set(
-
             0,
-
             0,
-
             maxDim * ENQUADRAMENTO
-
         );
 
 
         camera.near =
-
             maxDim / 100;
 
 
         camera.far =
-
             maxDim * 100;
 
 
@@ -472,14 +390,59 @@ loader.load(
 
 
         camera.lookAt(
-
             0,
-
             0,
-
             0
-
         );
+
+
+
+        /* =================================================
+           PRIMEIRO FRAME
+        ================================================= */
+
+        /*
+           O modelo é renderizado primeiro na posição
+           inicial enquanto ainda está invisível.
+        */
+
+        renderer.render(
+            scene,
+            camera
+        );
+
+
+        modeloCarregado = true;
+
+
+
+        /*
+           Espera dois frames do navegador.
+
+           Isso evita mostrar o modelo durante os
+           ajustes iniciais do iframe/Hotmart.
+        */
+
+        requestAnimationFrame(() => {
+
+            requestAnimationFrame(() => {
+
+
+                /* mostra o modelo */
+
+                renderer.domElement
+                    .classList
+                    .add('pronto');
+
+
+                /* libera a rotação */
+
+                animacaoIniciada = true;
+
+
+            });
+
+        });
 
 
     },
@@ -491,11 +454,8 @@ loader.load(
     function (error) {
 
         console.error(
-
             'Erro ao carregar STL:',
-
             error
-
         );
 
     }
@@ -505,7 +465,7 @@ loader.load(
 
 
 /* =====================================================
-   AJUSTE AUTOMÁTICO AO TAMANHO DA HOTMART
+   REDIMENSIONAMENTO
 ===================================================== */
 
 function resize() {
@@ -519,35 +479,39 @@ function resize() {
         window.innerHeight;
 
 
-
     camera.aspect =
-
         width / height;
 
 
     camera.updateProjectionMatrix();
 
 
-
     renderer.setSize(
-
         width,
-
         height,
-
         false
-
     );
+
+
+    /*
+       Só renderiza se o STL já estiver pronto.
+    */
+
+    if (modeloCarregado) {
+
+        renderer.render(
+            scene,
+            camera
+        );
+
+    }
 
 }
 
 
 window.addEventListener(
-
     'resize',
-
     resize
-
 );
 
 
@@ -560,25 +524,38 @@ function animate() {
 
 
     requestAnimationFrame(
-
         animate
-
     );
 
 
-    /* rotação automática */
+    /*
+       Antes do STL estar carregado,
+       não há nenhuma rotação.
+    */
 
-    rotationGroup.rotation.y +=
+    if (!modeloCarregado) {
 
-        VELOCIDADE;
+        return;
+
+    }
+
+
+    /*
+       Só começa a girar depois que
+       o primeiro frame estiver pronto.
+    */
+
+    if (animacaoIniciada) {
+
+        rotationGroup.rotation.y +=
+            VELOCIDADE;
+
+    }
 
 
     renderer.render(
-
         scene,
-
         camera
-
     );
 
 }
