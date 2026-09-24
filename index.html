@@ -2,7 +2,6 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>PSQI 3D</title>
@@ -10,7 +9,6 @@
 <style>
 html, body {
     margin: 0;
-    padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -20,7 +18,6 @@ html, body {
 #viewer {
     width: 100vw;
     height: 100vh;
-    background: transparent;
 }
 
 canvas {
@@ -31,12 +28,10 @@ canvas {
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
   }
 }
 </script>
-
 </head>
 
 <body>
@@ -46,16 +41,24 @@ canvas {
 <script type="module">
 
 import * as THREE from 'three';
-import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
-const container = document.getElementById('viewer');
 
-/* CENA */
+/* =========================
+   CONFIGURAÇÃO
+========================= */
+
+const PLY_URL =
+'./2026-08-05_100_026-UpperJaw.ply';
+
+const TEXTURE_URL =
+'./2026-08-05_100_026-UpperJaw.jpg';
+
+
+/* =========================
+   THREE.JS
+========================= */
 
 const scene = new THREE.Scene();
-
-
-/* CÂMERA */
 
 const camera = new THREE.PerspectiveCamera(
     35,
@@ -63,9 +66,6 @@ const camera = new THREE.PerspectiveCamera(
     0.1,
     10000
 );
-
-
-/* RENDER */
 
 const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -86,31 +86,30 @@ renderer.setClearColor(0x000000, 0);
 renderer.outputColorSpace =
     THREE.SRGBColorSpace;
 
-container.appendChild(renderer.domElement);
+document
+    .getElementById('viewer')
+    .appendChild(renderer.domElement);
 
 
-/* ILUMINAÇÃO */
+/* =========================
+   LUZ
+========================= */
 
-const ambient =
-    new THREE.AmbientLight(
+scene.add(
+    new THREE.HemisphereLight(
         0xffffff,
-        2
-    );
-
-scene.add(ambient);
-
+        0x777777,
+        2.2
+    )
+);
 
 const frontal =
     new THREE.DirectionalLight(
         0xffffff,
-        3
+        2.5
     );
 
-frontal.position.set(
-    0,
-    4,
-    10
-);
+frontal.position.set(0, 5, 10);
 
 scene.add(frontal);
 
@@ -118,181 +117,482 @@ scene.add(frontal);
 const lateral =
     new THREE.DirectionalLight(
         0xffffff,
-        2
+        1.5
     );
 
-lateral.position.set(
-    -5,
-    2,
-    4
-);
+lateral.position.set(-5, 1, 4);
 
 scene.add(lateral);
 
 
+/* =========================
+   LEITURA DO PLY
+========================= */
 
-/* TEXTURA */
+async function carregarPLY() {
 
-const textureLoader =
-    new THREE.TextureLoader();
+    const response =
+        await fetch(PLY_URL);
 
-textureLoader.load(
-
-    './2026-08-05_100_026-UpperJaw.jpg',
-
-    function(texture) {
-
-        texture.colorSpace =
-            THREE.SRGBColorSpace;
-
-        texture.flipY = false;
-
-        carregarPLY(texture);
-
-    },
-
-    undefined,
-
-    function(error) {
-
-        console.error(
-            'Erro ao carregar textura:',
-            error
+    if (!response.ok) {
+        throw new Error(
+            'Não foi possível carregar o PLY'
         );
-
     }
 
-);
+    const buffer =
+        await response.arrayBuffer();
 
+    const bytes =
+        new Uint8Array(buffer);
 
+    /*
+       Localiza "end_header"
+    */
 
-/* MODELO */
+    const decoder =
+        new TextDecoder('ascii');
 
-function carregarPLY(texture) {
-
-    const loader =
-        new PLYLoader();
-
-    loader.load(
-
-        './2026-08-05_100_026-UpperJaw.ply',
-
-        function(geometry) {
-
-            geometry.computeVertexNormals();
-
-            geometry.computeBoundingBox();
-
-            geometry.center();
-
-
-            /* MATERIAL */
-
-            const material =
-                new THREE.MeshStandardMaterial({
-
-                    map: texture,
-
-                    roughness: 0.6,
-
-                    metalness: 0,
-
-                    side: THREE.DoubleSide
-
-                });
-
-
-            const model =
-                new THREE.Mesh(
-                    geometry,
-                    material
-                );
-
-            scene.add(model);
-
-
-
-            /* ENQUADRAMENTO */
-
-            geometry.computeBoundingBox();
-
-            const size =
-                new THREE.Vector3();
-
-            geometry.boundingBox.getSize(size);
-
-            const maxDim =
-                Math.max(
-                    size.x,
-                    size.y,
-                    size.z
-                );
-
-
-            camera.position.set(
+    const inicio =
+        decoder.decode(
+            bytes.subarray(
                 0,
-                0,
-                maxDim * 2
+                Math.min(bytes.length, 10000)
+            )
+        );
+
+    const marcador =
+        'end_header';
+
+    const pos =
+        inicio.indexOf(marcador);
+
+    if (pos === -1) {
+        throw new Error(
+            'Cabeçalho PLY não encontrado'
+        );
+    }
+
+
+    /*
+       Descobre exatamente onde
+       começa o conteúdo binário
+    */
+
+    let dataStart =
+        pos + marcador.length;
+
+    while (
+        bytes[dataStart] === 10 ||
+        bytes[dataStart] === 13
+    ) {
+        dataStart++;
+    }
+
+
+    const header =
+        inicio.substring(
+            0,
+            pos + marcador.length
+        );
+
+
+    console.log(header);
+
+
+    /*
+       Quantidade de vértices e faces
+    */
+
+    const vertexMatch =
+        header.match(
+            /element vertex\s+(\d+)/
+        );
+
+    const faceMatch =
+        header.match(
+            /element face\s+(\d+)/
+        );
+
+    if (!vertexMatch || !faceMatch) {
+        throw new Error(
+            'Vértices ou faces não encontrados'
+        );
+    }
+
+    const vertexCount =
+        parseInt(vertexMatch[1]);
+
+    const faceCount =
+        parseInt(faceMatch[1]);
+
+
+    console.log(
+        'Vértices:',
+        vertexCount
+    );
+
+    console.log(
+        'Faces:',
+        faceCount
+    );
+
+
+    const view =
+        new DataView(buffer);
+
+    let offset =
+        dataStart;
+
+
+    /*
+       Vértices
+
+       Seu arquivo possui:
+       x float
+       y float
+       z float
+    */
+
+    const vertices =
+        new Array(vertexCount);
+
+    for (
+        let i = 0;
+        i < vertexCount;
+        i++
+    ) {
+
+        const x =
+            view.getFloat32(
+                offset,
+                true
             );
 
-            camera.near =
-                maxDim / 100;
+        offset += 4;
 
-            camera.far =
-                maxDim * 100;
+        const y =
+            view.getFloat32(
+                offset,
+                true
+            );
 
-            camera.updateProjectionMatrix();
+        offset += 4;
 
-            camera.lookAt(0,0,0);
+        const z =
+            view.getFloat32(
+                offset,
+                true
+            );
+
+        offset += 4;
+
+        vertices[i] = [x,y,z];
+    }
 
 
+    /*
+       Agora lemos cada face.
 
-            /* POSIÇÃO INICIAL */
+       Estrutura:
 
-            model.rotation.x =
-                THREE.MathUtils.degToRad(-10);
+       uchar quantidade índices
+       int índices...
+
+       uchar quantidade texcoords
+       float texcoords...
+    */
 
 
+    const positions = [];
+    const uvs = [];
 
-            /* ANIMAÇÃO */
 
-            function animate() {
+    for (
+        let f = 0;
+        f < faceCount;
+        f++
+    ) {
 
-                requestAnimationFrame(
-                    animate
+        /* índices */
+
+        const qtdIndices =
+            view.getUint8(offset);
+
+        offset += 1;
+
+
+        const indices = [];
+
+        for (
+            let j = 0;
+            j < qtdIndices;
+            j++
+        ) {
+
+            indices.push(
+                view.getInt32(
+                    offset,
+                    true
+                )
+            );
+
+            offset += 4;
+        }
+
+
+        /* coordenadas da textura */
+
+        const qtdTexcoords =
+            view.getUint8(offset);
+
+        offset += 1;
+
+
+        const texcoords = [];
+
+        for (
+            let j = 0;
+            j < qtdTexcoords;
+            j++
+        ) {
+
+            texcoords.push(
+                view.getFloat32(
+                    offset,
+                    true
+                )
+            );
+
+            offset += 4;
+        }
+
+
+        /*
+           Normalmente:
+           3 vértices
+           6 valores UV
+
+           u1 v1
+           u2 v2
+           u3 v3
+        */
+
+        if (
+            qtdIndices === 3 &&
+            texcoords.length >= 6
+        ) {
+
+            for (
+                let j = 0;
+                j < 3;
+                j++
+            ) {
+
+                const v =
+                    vertices[
+                        indices[j]
+                    ];
+
+                positions.push(
+                    v[0],
+                    v[1],
+                    v[2]
                 );
 
-                model.rotation.y +=
-                    0.005;
 
-                renderer.render(
-                    scene,
-                    camera
+                uvs.push(
+                    texcoords[j * 2],
+                    texcoords[j * 2 + 1]
                 );
 
             }
 
-            animate();
-
-        },
-
-        undefined,
-
-        function(error) {
-
-            console.error(
-                'Erro ao carregar PLY:',
-                error
-            );
-
         }
 
+    }
+
+
+    console.log(
+        'Triângulos processados:',
+        positions.length / 9
     );
+
+
+    /* =========================
+       GEOMETRIA THREE.JS
+    ========================= */
+
+    const geometry =
+        new THREE.BufferGeometry();
+
+
+    geometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(
+            positions,
+            3
+        )
+    );
+
+
+    geometry.setAttribute(
+        'uv',
+        new THREE.Float32BufferAttribute(
+            uvs,
+            2
+        )
+    );
+
+
+    geometry.computeVertexNormals();
+
+    geometry.computeBoundingBox();
+
+    geometry.center();
+
+
+    /* =========================
+       TEXTURA
+    ========================= */
+
+    const texture =
+        await new THREE.TextureLoader()
+            .loadAsync(TEXTURE_URL);
+
+    texture.colorSpace =
+        THREE.SRGBColorSpace;
+
+
+    /*
+       IMPORTANTE
+
+       PLY e imagem utilizam
+       origem diferente no eixo Y.
+    */
+
+    texture.flipY = false;
+
+
+    texture.minFilter =
+        THREE.LinearMipmapLinearFilter;
+
+    texture.magFilter =
+        THREE.LinearFilter;
+
+
+    /* =========================
+       MATERIAL
+    ========================= */
+
+    const material =
+        new THREE.MeshStandardMaterial({
+
+            map: texture,
+
+            roughness: 0.75,
+
+            metalness: 0,
+
+            side: THREE.DoubleSide
+
+        });
+
+
+    const model =
+        new THREE.Mesh(
+            geometry,
+            material
+        );
+
+
+    scene.add(model);
+
+
+    /* =========================
+       ENQUADRAMENTO
+    ========================= */
+
+    geometry.computeBoundingBox();
+
+    const size =
+        new THREE.Vector3();
+
+    geometry.boundingBox.getSize(size);
+
+    const maxDim =
+        Math.max(
+            size.x,
+            size.y,
+            size.z
+        );
+
+
+    camera.position.set(
+        0,
+        0,
+        maxDim * 1.9
+    );
+
+    camera.near =
+        maxDim / 100;
+
+    camera.far =
+        maxDim * 100;
+
+    camera.updateProjectionMatrix();
+
+    camera.lookAt(0,0,0);
+
+
+    /*
+       Inclinação inicial
+    */
+
+    model.rotation.x =
+        THREE.MathUtils.degToRad(-10);
+
+
+    /* =========================
+       ANIMAÇÃO
+    ========================= */
+
+    function animate() {
+
+        requestAnimationFrame(
+            animate
+        );
+
+        model.rotation.y +=
+            0.004;
+
+        renderer.render(
+            scene,
+            camera
+        );
+
+    }
+
+    animate();
 
 }
 
 
-/* RESPONSIVO */
+/* =========================
+   INICIAR
+========================= */
+
+carregarPLY()
+.catch(error => {
+
+    console.error(error);
+
+});
+
+
+/* =========================
+   RESPONSIVO
+========================= */
 
 window.addEventListener(
     'resize',
