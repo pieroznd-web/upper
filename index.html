@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
 <meta charset="UTF-8">
 
@@ -16,44 +17,37 @@ html,
 body {
     width: 100%;
     height: 100%;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    background: transparent !important;
-}
-
-body {
-    position: relative;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
 }
 
 canvas {
-    position: absolute;
-    top: 10px;
-    left: 0;
-
-    width: 100% !important;
-    height: calc(100% - 20px) !important;
-
-    display: block !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 </style>
-
 </head>
 
+
 <body>
+
 
 <script type="importmap">
 {
     "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        "three":
+        "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+
+        "three/addons/":
+        "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
     }
 }
 </script>
+
 
 <script type="module">
 
@@ -64,17 +58,54 @@ import {
 } from 'three/addons/loaders/STLLoader.js';
 
 
-/* =========================
+
+/* =====================================================
+   CONFIGURAÇÕES FÁCEIS DE ALTERAR
+===================================================== */
+
+
+/* velocidade da rotação */
+
+const VELOCIDADE = 0.002;
+
+
+/*
+   ENQUADRAMENTO
+
+   menor número = dente maior
+   maior número = dente menor
+
+   2.05 = quase rente
+   2.10 = pouco espaço
+   2.15 = recomendado
+   2.20 = mais espaço
+   2.30 = bastante espaço
+*/
+
+const ENQUADRAMENTO = 2.15;
+
+
+/*
+   posição inicial da rotação
+   180 = lado oposto ao original
+*/
+
+const ANGULO_INICIAL = 180;
+
+
+
+/* =====================================================
    CENA
-========================= */
+===================================================== */
 
 const scene =
     new THREE.Scene();
 
 
-/* =========================
+
+/* =====================================================
    CÂMERA
-========================= */
+===================================================== */
 
 const camera =
     new THREE.PerspectiveCamera(
@@ -86,133 +117,238 @@ const camera =
     );
 
 
-/* =========================
-   RENDER
-========================= */
+
+/* =====================================================
+   RENDERIZADOR
+===================================================== */
 
 const renderer =
     new THREE.WebGLRenderer({
+
         antialias: true,
+
         alpha: true
+
     });
 
+
 renderer.setPixelRatio(
+
     Math.min(
+
         window.devicePixelRatio,
+
         2
+
     )
+
 );
+
 
 renderer.setSize(
+
     window.innerWidth,
+
     window.innerHeight
+
 );
+
 
 renderer.setClearColor(
+
     0x000000,
+
     0
+
 );
+
 
 document.body.appendChild(
+
     renderer.domElement
+
 );
 
 
-/* =========================
-   ILUMINAÇÃO
-========================= */
 
-const ambient =
+/* =====================================================
+   ILUMINAÇÃO
+===================================================== */
+
+
+/* luz geral */
+
+const ambientLight =
     new THREE.AmbientLight(
+
         0xffffff,
+
         0.65
+
     );
 
-scene.add(ambient);
+scene.add(
 
+    ambientLight
+
+);
+
+
+
+/* luz principal */
 
 const mainLight =
     new THREE.DirectionalLight(
+
         0xffffff,
+
         2.2
+
     );
 
+
 mainLight.position.set(
+
     4,
+
     6,
+
     8
+
 );
 
-scene.add(mainLight);
 
+scene.add(
+
+    mainLight
+
+);
+
+
+
+/* luz lateral */
 
 const sideLight =
     new THREE.DirectionalLight(
+
         0xffffff,
+
         1.2
+
     );
 
+
 sideLight.position.set(
+
     -5,
+
     2,
+
     4
+
 );
 
-scene.add(sideLight);
 
+scene.add(
+
+    sideLight
+
+);
+
+
+
+/* luz inferior */
 
 const fillLight =
     new THREE.DirectionalLight(
+
         0xffffff,
+
         0.7
+
     );
 
+
 fillLight.position.set(
+
     0,
+
     -5,
+
     3
+
 );
 
-scene.add(fillLight);
+
+scene.add(
+
+    fillLight
+
+);
 
 
-/* =========================
-   GRUPOS
-========================= */
+
+/* =====================================================
+   GRUPO RESPONSÁVEL PELO GIRO
+===================================================== */
 
 const rotationGroup =
     new THREE.Group();
 
-scene.add(rotationGroup);
+
+scene.add(
+
+    rotationGroup
+
+);
 
 
-/* posição inicial 180 graus */
+/* posição inicial */
+
 rotationGroup.rotation.y =
-    THREE.MathUtils.degToRad(180);
 
+    THREE.MathUtils.degToRad(
+
+        ANGULO_INICIAL
+
+    );
+
+
+
+/* =====================================================
+   GRUPO RESPONSÁVEL PELA ORIENTAÇÃO DO DENTE
+===================================================== */
 
 const orientationGroup =
     new THREE.Group();
 
+
 rotationGroup.add(
+
     orientationGroup
+
 );
 
 
-/* orientação do STL */
+/* orientação correta do STL */
 
 orientationGroup.rotation.x =
+
     THREE.MathUtils.degToRad(-90);
+
 
 orientationGroup.rotation.y = 0;
 
+
 orientationGroup.rotation.z =
+
     THREE.MathUtils.degToRad(180);
 
 
-/* =========================
-   STL
-========================= */
+
+/* =====================================================
+   CARREGAMENTO DO STL
+===================================================== */
 
 const loader =
     new STLLoader();
@@ -222,11 +358,22 @@ loader.load(
 
     './coroa%20reduzida%2021%20com%20palatina.stl',
 
+
     function (geometry) {
 
+
+        /* melhora a iluminação da superfície */
+
         geometry.computeVertexNormals();
+
+
+        /* coloca o modelo no centro */
+
         geometry.center();
 
+
+
+        /* MATERIAL */
 
         const material =
             new THREE.MeshStandardMaterial({
@@ -242,59 +389,113 @@ loader.load(
             });
 
 
+
+        /* MODELO */
+
         const model =
             new THREE.Mesh(
+
                 geometry,
+
                 material
+
             );
 
 
         orientationGroup.add(
+
             model
+
         );
 
 
-        /* =====================
-           TAMANHO DO MODELO
-        ===================== */
+
+        /* =================================================
+           CALCULA O TAMANHO DO STL
+        ================================================= */
+
 
         geometry.computeBoundingBox();
+
 
         const size =
             new THREE.Vector3();
 
+
         geometry.boundingBox.getSize(
+
             size
+
         );
+
 
         const maxDim =
             Math.max(
+
                 size.x,
+
                 size.y,
+
                 size.z
+
             );
 
 
-        /* distância da câmera */
+
+        /* =================================================
+           ENQUADRAMENTO
+        ================================================= */
+
 
         camera.position.set(
+
             0,
+
             0,
-            maxDim * 2.0
+
+            maxDim * ENQUADRAMENTO
+
         );
 
+
         camera.near =
+
             maxDim / 100;
 
+
         camera.far =
+
             maxDim * 100;
+
 
         camera.updateProjectionMatrix();
 
+
         camera.lookAt(
+
             0,
+
             0,
+
             0
+
+        );
+
+
+    },
+
+
+    undefined,
+
+
+    function (error) {
+
+        console.error(
+
+            'Erro ao carregar STL:',
+
+            error
+
         );
 
     }
@@ -302,66 +503,92 @@ loader.load(
 );
 
 
-/* =========================
-   REDIMENSIONAMENTO
-========================= */
+
+/* =====================================================
+   AJUSTE AUTOMÁTICO AO TAMANHO DA HOTMART
+===================================================== */
 
 function resize() {
 
+
     const width =
         window.innerWidth;
+
 
     const height =
         window.innerHeight;
 
 
+
     camera.aspect =
+
         width / height;
+
 
     camera.updateProjectionMatrix();
 
 
+
     renderer.setSize(
+
         width,
+
         height,
+
         false
+
     );
 
 }
 
+
 window.addEventListener(
+
     'resize',
+
     resize
+
 );
 
 
-/* =========================
+
+/* =====================================================
    ANIMAÇÃO
-========================= */
+===================================================== */
 
 function animate() {
 
+
     requestAnimationFrame(
+
         animate
+
     );
 
 
-    /* VELOCIDADE DO GIRO */
+    /* rotação automática */
 
     rotationGroup.rotation.y +=
-        0.015;
+
+        VELOCIDADE;
 
 
     renderer.render(
+
         scene,
+
         camera
+
     );
 
 }
 
+
 animate();
+
 
 </script>
 
 </body>
+
 </html>
