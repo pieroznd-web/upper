@@ -1,410 +1,70 @@
-
-        const base = i * 3;
-
-
-        /* XYZ */
-
-        vertices[base] =
-            view.getFloat32(
-                offset,
-                true
-            );
-
-        offset += 4;
-
-
-        vertices[base + 1] =
-            view.getFloat32(
-                offset,
-                true
-            );
-
-        offset += 4;
-
-
-        vertices[base + 2] =
-            view.getFloat32(
-                offset,
-                true
-            );
-
-        offset += 4;
-
-
-        /*
-           NX NY NZ
-
-           Precisamos avançar 12 bytes.
-           Não precisamos armazená-los,
-           pois recalcularemos as normais.
-        */
-
-        offset += 12;
-    }
-
-
-    /* =========================
-       TRIÂNGULOS + UV
-    ========================= */
-
-
-    /*
-       Seu arquivo possui aproximadamente
-       438 mil triângulos.
-
-       Já reservamos a memória.
-    */
-
-    const positions =
-        new Float32Array(
-            faceCount * 9
-        );
-
-    const uvs =
-        new Float32Array(
-            faceCount * 6
-        );
-
-
-    let positionPointer = 0;
-    let uvPointer = 0;
-
-    let triangulos = 0;
-
-
-    for (
-        let f = 0;
-        f < faceCount;
-        f++
-    ) {
-
-        /* quantidade de vértices */
-
-        const qtdIndices =
-            view.getUint8(offset);
-
-        offset += 1;
-
-
-        const indices = [];
-
-        for (
-            let i = 0;
-            i < qtdIndices;
-            i++
-        ) {
-
-            indices.push(
-                view.getInt32(
-                    offset,
-                    true
-                )
-            );
-
-            offset += 4;
-        }
-
-
-        /* quantidade de floats UV */
-
-        const qtdUV =
-            view.getUint8(offset);
-
-        offset += 1;
-
-
-        const texcoords = [];
-
-        for (
-            let i = 0;
-            i < qtdUV;
-            i++
-        ) {
-
-            texcoords.push(
-                view.getFloat32(
-                    offset,
-                    true
-                )
-            );
-
-            offset += 4;
-        }
-
-
-        /*
-           Nosso caso:
-           triângulo = 3 índices
-           UV = 6 floats
-        */
-
-        if (
-            qtdIndices === 3 &&
-            qtdUV >= 6
-        ) {
-
-            for (
-                let i = 0;
-                i < 3;
-                i++
-            ) {
-
-                const vertexIndex =
-                    indices[i] * 3;
-
-
-                positions[
-                    positionPointer++
-                ] =
-                    vertices[
-                        vertexIndex
-                    ];
-
-
-                positions[
-                    positionPointer++
-                ] =
-                    vertices[
-                        vertexIndex + 1
-                    ];
-
-
-                positions[
-                    positionPointer++
-                ] =
-                    vertices[
-                        vertexIndex + 2
-                    ];
-
-
-                uvs[
-                    uvPointer++
-                ] =
-                    texcoords[
-                        i * 2
-                    ];
-
-
-                uvs[
-                    uvPointer++
-                ] =
-                    texcoords[
-                        i * 2 + 1
-                    ];
-
-            }
-
-            triangulos++;
-
-        }
-
-    }
-
-
-    console.log(
-        'Triângulos:',
-        triangulos
-    );
-
-
-    /* =========================
-       GEOMETRIA
-    ========================= */
-
-    const geometry =
-        new THREE.BufferGeometry();
-
-
-    geometry.setAttribute(
-        'position',
-        new THREE.BufferAttribute(
-            positions,
-            3
-        )
-    );
-
-
-    geometry.setAttribute(
-        'uv',
-        new THREE.BufferAttribute(
-            uvs,
-            2
-        )
-    );
-
-
-    geometry.computeVertexNormals();
-
-    geometry.computeBoundingBox();
-
-    geometry.center();
-
-
-    /* =========================
-       TEXTURA
-    ========================= */
-
-    const texture =
-        await new THREE.TextureLoader()
-        .loadAsync(TEXTURE_URL);
-
-
-    texture.colorSpace =
-        THREE.SRGBColorSpace;
-
-
-    /*
-       MUITO IMPORTANTE
-       para esse tipo de PLY.
-    */
-
-    texture.flipY = false;
-
-
-    texture.wrapS =
-        THREE.ClampToEdgeWrapping;
-
-    texture.wrapT =
-        THREE.ClampToEdgeWrapping;
-
-
-    /* =========================
-       MATERIAL
-    ========================= */
-
-    const material =
-        new THREE.MeshStandardMaterial({
-
-            map: texture,
-
-            roughness: 0.8,
-
-            metalness: 0,
-
-            side: THREE.DoubleSide
-
-        });
-
-
-    const model =
-        new THREE.Mesh(
-            geometry,
-            material
-        );
-
-
-    scene.add(model);
-
-
-    /* =========================
-       CÂMERA
-    ========================= */
-
-    const box =
-        new THREE.Box3()
-        .setFromObject(model);
-
-
-    const size =
-        new THREE.Vector3();
-
-    box.getSize(size);
-
-
-    const maxDim =
-        Math.max(
-            size.x,
-            size.y,
-            size.z
-        );
-
-
-    camera.position.set(
-        0,
-        0,
-        maxDim * 1.8
-    );
-
-
-    camera.near =
-        maxDim / 100;
-
-    camera.far =
-        maxDim * 100;
-
-    camera.updateProjectionMatrix();
-
-    camera.lookAt(0,0,0);
-
-
-    /* pequena inclinação */
-
-    model.rotation.x =
-        THREE.MathUtils
-        .degToRad(-10);
-
-
-    /* =========================
-       GIRAR SOZINHO
-    ========================= */
-
-    function animate() {
-
-        requestAnimationFrame(
-            animate
-        );
-
-
-        model.rotation.y +=
-            0.004;
-
-
-        renderer.render(
-            scene,
-            camera
-        );
-
-    }
-
-
-    animate();
-
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html,body {
+  margin:0;
+  width:100%;
+  height:100%;
+  background:transparent;
+  overflow:hidden;
 }
+</style>
+</head>
 
+<body>
 
-/* INICIAR */
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 
-carregarModelo()
+<script>
 
-.catch(error => {
+const scene = new THREE.Scene();
 
-    console.error(error);
+const camera = new THREE.PerspectiveCamera(
+  50,
+  window.innerWidth/window.innerHeight,
+  0.1,
+  100
+);
 
-    document.body.innerHTML +=
-        '<div style="color:red;position:absolute;top:20px;left:20px;font-family:Arial;">Erro ao carregar modelo 3D. Abra o console.</div>';
-
+const renderer = new THREE.WebGLRenderer({
+  antialias:true,
+  alpha:true
 });
 
-
-/* RESPONSIVO */
-
-window.addEventListener(
-    'resize',
-    () => {
-
-        camera.aspect =
-            window.innerWidth /
-            window.innerHeight;
-
-        camera.updateProjectionMatrix();
-
-        renderer.setSize(
-            window.innerWidth,
-            window.innerHeight
-        );
-
-    }
+renderer.setSize(
+  window.innerWidth,
+  window.innerHeight
 );
+
+renderer.setClearColor(0x000000,0);
+
+document.body.appendChild(renderer.domElement);
+
+const geometry = new THREE.BoxGeometry(2,2,2);
+
+const material = new THREE.MeshNormalMaterial();
+
+const cube = new THREE.Mesh(
+  geometry,
+  material
+);
+
+scene.add(cube);
+
+camera.position.z = 5;
+
+function animate(){
+
+  requestAnimationFrame(animate);
+
+  cube.rotation.x += 0.01;
+  cube.rotation.y += 0.01;
+
+  renderer.render(scene,camera);
+}
+
+animate();
 
 </script>
 
