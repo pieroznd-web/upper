@@ -1,260 +1,545 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
 
 <title>Modelo 3D</title>
 
 <style>
-html, body {
+
+html,
+body {
     margin: 0;
     padding: 0;
+
     width: 100%;
     height: 100%;
+
     overflow: hidden;
+
     background: transparent;
 }
 
 #viewer {
     width: 100vw;
     height: 100vh;
+
+    background: transparent;
 }
 
 canvas {
     display: block;
 }
+
 </style>
+
 
 <script type="importmap">
 {
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
-  }
+    "imports": {
+        "three":
+        "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+
+        "three/addons/":
+        "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
 }
 </script>
 
 </head>
 
+
 <body>
 
 <div id="viewer"></div>
 
+
 <script type="module">
 
 import * as THREE from 'three';
-import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+import {
+    STLLoader
+}
+from 'three/addons/loaders/STLLoader.js';
 
 
-/* CENA */
 
-const scene = new THREE.Scene();
+/* ==================================================
+   CENA
+================================================== */
 
-
-/* CÂMERA */
-
-const camera = new THREE.PerspectiveCamera(
-    35,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    10000
-);
+const scene =
+    new THREE.Scene();
 
 
-/* RENDER */
 
-const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true
-});
+/* ==================================================
+   CÂMERA
+================================================== */
+
+const camera =
+    new THREE.PerspectiveCamera(
+
+        32,
+
+        window.innerWidth /
+        window.innerHeight,
+
+        0.1,
+
+        10000
+    );
+
+
+
+/* ==================================================
+   RENDER
+================================================== */
+
+const renderer =
+    new THREE.WebGLRenderer({
+
+        antialias: true,
+
+        alpha: true
+
+    });
+
 
 renderer.setPixelRatio(
-    Math.min(window.devicePixelRatio, 2)
+
+    Math.min(
+        window.devicePixelRatio,
+        2
+    )
+
 );
+
 
 renderer.setSize(
+
     window.innerWidth,
+
     window.innerHeight
+
 );
 
-renderer.setClearColor(0x000000, 0);
+
+renderer.setClearColor(
+
+    0x000000,
+
+    0
+
+);
+
 
 renderer.outputColorSpace =
     THREE.SRGBColorSpace;
 
+
 document
     .getElementById('viewer')
-    .appendChild(renderer.domElement);
+    .appendChild(
+        renderer.domElement
+    );
 
 
-/* ILUMINAÇÃO */
 
-const ambient =
+/* ==================================================
+   ILUMINAÇÃO
+================================================== */
+
+
+/*
+Luz ambiente mais baixa.
+
+Isso evita aquele aspecto
+"estourado" que estava acontecendo.
+*/
+
+const ambientLight =
     new THREE.AmbientLight(
+
         0xffffff,
-        1.8
+
+        0.65
+
     );
 
-scene.add(ambient);
-
-
-const light1 =
-    new THREE.DirectionalLight(
-        0xffffff,
-        3
-    );
-
-light1.position.set(
-    5,
-    8,
-    10
+scene.add(
+    ambientLight
 );
 
-scene.add(light1);
 
 
-const light2 =
+/*
+Luz principal
+*/
+
+const mainLight =
     new THREE.DirectionalLight(
+
         0xffffff,
-        1.8
+
+        2.2
+
     );
 
-light2.position.set(
+mainLight.position.set(
+
+    4,
+
+    6,
+
+    8
+
+);
+
+scene.add(
+    mainLight
+);
+
+
+
+/*
+Luz lateral
+*/
+
+const sideLight =
+    new THREE.DirectionalLight(
+
+        0xffffff,
+
+        1.2
+
+    );
+
+sideLight.position.set(
+
     -5,
-    3,
-    5
+
+    2,
+
+    4
+
 );
 
-scene.add(light2);
+scene.add(
+    sideLight
+);
 
 
-const light3 =
+
+/*
+Luz de preenchimento inferior
+*/
+
+const fillLight =
     new THREE.DirectionalLight(
+
         0xffffff,
-        1
+
+        0.7
+
     );
 
-light3.position.set(
+fillLight.position.set(
+
     0,
+
     -5,
-    -5
+
+    3
+
 );
 
-scene.add(light3);
+scene.add(
+    fillLight
+);
 
 
-/* CARREGAR STL */
 
-const loader = new STLLoader();
+/* ==================================================
+   GRUPOS
+================================================== */
+
+
+/*
+Este grupo é responsável
+APENAS pela rotação automática.
+
+Ele permanece "em pé".
+*/
+
+const rotationGroup =
+    new THREE.Group();
+
+scene.add(
+    rotationGroup
+);
+
+
+
+/*
+Este grupo corrige a orientação
+original do STL.
+
+Assim a correção não interfere
+na rotação de 360 graus.
+*/
+
+const orientationGroup =
+    new THREE.Group();
+
+rotationGroup.add(
+    orientationGroup
+);
+
+
+
+/* ==================================================
+   STL
+================================================== */
+
+const loader =
+    new STLLoader();
+
 
 loader.load(
 
     './coroa%20reduzida%2021%20com%20palatina.stl',
 
+
     function(geometry) {
 
+
+        /* ------------------------------
+           PREPARAR GEOMETRIA
+        ------------------------------ */
+
         geometry.computeVertexNormals();
+
         geometry.computeBoundingBox();
 
-        /* CENTRALIZAR */
+
+        /*
+        Centraliza o STL
+        no ponto 0,0,0
+        */
 
         geometry.center();
 
 
-        /* MATERIAL */
+
+        /* ------------------------------
+           MATERIAL
+        ------------------------------ */
 
         const material =
             new THREE.MeshStandardMaterial({
 
-                color: 0xe8e4dc,
+                /*
+                Tom levemente acinzentado
+                para não desaparecer
+                sobre fundo branco.
+                */
 
-                roughness: 0.38,
+                color: 0xd2d0ca,
+
+                roughness: 0.62,
 
                 metalness: 0,
 
-                side: THREE.DoubleSide
+                side:
+                    THREE.DoubleSide
 
             });
 
 
+
+        /* ------------------------------
+           CRIAR MODELO
+        ------------------------------ */
+
         const model =
             new THREE.Mesh(
+
                 geometry,
+
                 material
+
             );
 
-        scene.add(model);
+
+        orientationGroup.add(
+            model
+        );
 
 
-        /* TAMANHO */
 
-        geometry.computeBoundingBox();
+        /* ==================================================
+           CORRIGIR ORIENTAÇÃO DO STL
+        ================================================== */
+
+
+        /*
+        Esta rotação corrige o sistema
+        de coordenadas utilizado na
+        exportação odontológica.
+        */
+
+        orientationGroup.rotation.x =
+            THREE.MathUtils.degToRad(
+                -90
+            );
+
+
+        orientationGroup.rotation.y =
+            0;
+
+
+        orientationGroup.rotation.z =
+            THREE.MathUtils.degToRad(
+                180
+            );
+
+
+
+        /* ==================================================
+           TAMANHO DO MODELO
+        ================================================== */
+
+        const box =
+            new THREE.Box3()
+            .setFromObject(
+                rotationGroup
+            );
+
 
         const size =
             new THREE.Vector3();
 
-        geometry.boundingBox.getSize(size);
+
+        box.getSize(
+            size
+        );
+
 
         const maxDim =
             Math.max(
+
                 size.x,
+
                 size.y,
+
                 size.z
+
             );
 
 
-        /* CÂMERA */
+
+        /* ==================================================
+           POSICIONAR CÂMERA
+        ================================================== */
+
+
+        /*
+        Quanto MENOR esse número,
+        maior o objeto aparece.
+        */
 
         camera.position.set(
+
             0,
+
             0,
-            maxDim * 2.0
+
+            maxDim * 1.75
+
         );
+
 
         camera.near =
             maxDim / 100;
 
+
         camera.far =
             maxDim * 100;
 
+
         camera.updateProjectionMatrix();
 
-        camera.lookAt(0, 0, 0);
+
+        camera.lookAt(
+
+            0,
+
+            0,
+
+            0
+
+        );
 
 
-        /* POSIÇÃO INICIAL */
 
-        model.rotation.x =
-            THREE.MathUtils.degToRad(-10);
+        /* ==================================================
+           ANIMAÇÃO
+        ================================================== */
 
-
-        /* ROTAÇÃO AUTOMÁTICA */
 
         function animate() {
 
-            requestAnimationFrame(animate);
 
-            model.rotation.y += 0.005;
+            requestAnimationFrame(
+                animate
+            );
+
+
+            /*
+            Agora quem gira é o grupo externo.
+
+            A orientação corrigida do STL
+            permanece intacta.
+            */
+
+            rotationGroup.rotation.y +=
+                0.004;
+
 
             renderer.render(
+
                 scene,
+
                 camera
+
             );
 
         }
+
 
         animate();
 
     },
 
+
     undefined,
+
 
     function(error) {
 
         console.error(
+
             'Erro ao carregar STL:',
+
             error
+
         );
 
     }
@@ -262,27 +547,42 @@ loader.load(
 );
 
 
-/* RESPONSIVO */
+
+/* ==================================================
+   RESPONSIVO
+================================================== */
 
 window.addEventListener(
+
     'resize',
+
     function() {
 
+
         camera.aspect =
+
             window.innerWidth /
+
             window.innerHeight;
+
 
         camera.updateProjectionMatrix();
 
+
         renderer.setSize(
+
             window.innerWidth,
+
             window.innerHeight
+
         );
 
     }
+
 );
 
 </script>
 
 </body>
+
 </html>
