@@ -1,1 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>PSQI 3D</title>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+}
+
+#viewer {
+    width: 100vw;
+    height: 100vh;
+    background: transparent;
+}
+
+canvas {
+    display: block;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+  }
+}
+</script>
+
+</head>
+
+<body>
+
+<div id="viewer"></div>
+
+<script type="module">
+
+import * as THREE from 'three';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+
+const container = document.getElementById('viewer');
+
+/* CENA */
+
+const scene = new THREE.Scene();
+
+
+/* CÂMERA */
+
+const camera = new THREE.PerspectiveCamera(
+    35,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    10000
+);
+
+
+/* RENDER */
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true
+});
+
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+);
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.setClearColor(0x000000, 0);
+
+renderer.outputColorSpace =
+    THREE.SRGBColorSpace;
+
+container.appendChild(renderer.domElement);
+
+
+/* ILUMINAÇÃO */
+
+const ambient =
+    new THREE.AmbientLight(
+        0xffffff,
+        2
+    );
+
+scene.add(ambient);
+
+
+const frontal =
+    new THREE.DirectionalLight(
+        0xffffff,
+        3
+    );
+
+frontal.position.set(
+    0,
+    4,
+    10
+);
+
+scene.add(frontal);
+
+
+const lateral =
+    new THREE.DirectionalLight(
+        0xffffff,
+        2
+    );
+
+lateral.position.set(
+    -5,
+    2,
+    4
+);
+
+scene.add(lateral);
+
+
+
+/* TEXTURA */
+
+const textureLoader =
+    new THREE.TextureLoader();
+
+textureLoader.load(
+
+    './2026-08-05_100_026-UpperJaw.jpg',
+
+    function(texture) {
+
+        texture.colorSpace =
+            THREE.SRGBColorSpace;
+
+        texture.flipY = false;
+
+        carregarPLY(texture);
+
+    },
+
+    undefined,
+
+    function(error) {
+
+        console.error(
+            'Erro ao carregar textura:',
+            error
+        );
+
+    }
+
+);
+
+
+
+/* MODELO */
+
+function carregarPLY(texture) {
+
+    const loader =
+        new PLYLoader();
+
+    loader.load(
+
+        './2026-08-05_100_026-UpperJaw.ply',
+
+        function(geometry) {
+
+            geometry.computeVertexNormals();
+
+            geometry.computeBoundingBox();
+
+            geometry.center();
+
+
+            /* MATERIAL */
+
+            const material =
+                new THREE.MeshStandardMaterial({
+
+                    map: texture,
+
+                    roughness: 0.6,
+
+                    metalness: 0,
+
+                    side: THREE.DoubleSide
+
+                });
+
+
+            const model =
+                new THREE.Mesh(
+                    geometry,
+                    material
+                );
+
+            scene.add(model);
+
+
+
+            /* ENQUADRAMENTO */
+
+            geometry.computeBoundingBox();
+
+            const size =
+                new THREE.Vector3();
+
+            geometry.boundingBox.getSize(size);
+
+            const maxDim =
+                Math.max(
+                    size.x,
+                    size.y,
+                    size.z
+                );
+
+
+            camera.position.set(
+                0,
+                0,
+                maxDim * 2
+            );
+
+            camera.near =
+                maxDim / 100;
+
+            camera.far =
+                maxDim * 100;
+
+            camera.updateProjectionMatrix();
+
+            camera.lookAt(0,0,0);
+
+
+
+            /* POSIÇÃO INICIAL */
+
+            model.rotation.x =
+                THREE.MathUtils.degToRad(-10);
+
+
+
+            /* ANIMAÇÃO */
+
+            function animate() {
+
+                requestAnimationFrame(
+                    animate
+                );
+
+                model.rotation.y +=
+                    0.005;
+
+                renderer.render(
+                    scene,
+                    camera
+                );
+
+            }
+
+            animate();
+
+        },
+
+        undefined,
+
+        function(error) {
+
+            console.error(
+                'Erro ao carregar PLY:',
+                error
+            );
+
+        }
+
+    );
+
+}
+
+
+/* RESPONSIVO */
+
+window.addEventListener(
+    'resize',
+    function() {
+
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+    }
+);
+
+</script>
+
+</body>
+</html>
