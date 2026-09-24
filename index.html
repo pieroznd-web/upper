@@ -1,70 +1,286 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Modelo 3D</title>
+
 <style>
-html,body {
-  margin:0;
-  width:100%;
-  height:100%;
-  background:transparent;
-  overflow:hidden;
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+}
+
+#viewer {
+    width: 100vw;
+    height: 100vh;
+}
+
+canvas {
+    display: block;
 }
 </style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+  }
+}
+</script>
+
 </head>
 
 <body>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<div id="viewer"></div>
 
-<script>
+<script type="module">
+
+import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+
+/* CENA */
 
 const scene = new THREE.Scene();
 
+
+/* CÂMERA */
+
 const camera = new THREE.PerspectiveCamera(
-  50,
-  window.innerWidth/window.innerHeight,
-  0.1,
-  100
+    35,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    10000
 );
+
+
+/* RENDER */
 
 const renderer = new THREE.WebGLRenderer({
-  antialias:true,
-  alpha:true
+    antialias: true,
+    alpha: true
 });
 
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+);
+
 renderer.setSize(
-  window.innerWidth,
-  window.innerHeight
+    window.innerWidth,
+    window.innerHeight
 );
 
-renderer.setClearColor(0x000000,0);
+renderer.setClearColor(0x000000, 0);
 
-document.body.appendChild(renderer.domElement);
+renderer.outputColorSpace =
+    THREE.SRGBColorSpace;
 
-const geometry = new THREE.BoxGeometry(2,2,2);
+document
+    .getElementById('viewer')
+    .appendChild(renderer.domElement);
 
-const material = new THREE.MeshNormalMaterial();
 
-const cube = new THREE.Mesh(
-  geometry,
-  material
+/* ILUMINAÇÃO */
+
+const ambient =
+    new THREE.AmbientLight(
+        0xffffff,
+        1.8
+    );
+
+scene.add(ambient);
+
+
+const light1 =
+    new THREE.DirectionalLight(
+        0xffffff,
+        3
+    );
+
+light1.position.set(
+    5,
+    8,
+    10
 );
 
-scene.add(cube);
+scene.add(light1);
 
-camera.position.z = 5;
 
-function animate(){
+const light2 =
+    new THREE.DirectionalLight(
+        0xffffff,
+        1.8
+    );
 
-  requestAnimationFrame(animate);
+light2.position.set(
+    -5,
+    3,
+    5
+);
 
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
+scene.add(light2);
 
-  renderer.render(scene,camera);
-}
 
-animate();
+const light3 =
+    new THREE.DirectionalLight(
+        0xffffff,
+        1
+    );
+
+light3.position.set(
+    0,
+    -5,
+    -5
+);
+
+scene.add(light3);
+
+
+/* CARREGAR STL */
+
+const loader = new STLLoader();
+
+loader.load(
+
+    './coroa%20reduzida%2021%20com%20palatina.stl',
+
+    function(geometry) {
+
+        geometry.computeVertexNormals();
+        geometry.computeBoundingBox();
+
+        /* CENTRALIZAR */
+
+        geometry.center();
+
+
+        /* MATERIAL */
+
+        const material =
+            new THREE.MeshStandardMaterial({
+
+                color: 0xe8e4dc,
+
+                roughness: 0.38,
+
+                metalness: 0,
+
+                side: THREE.DoubleSide
+
+            });
+
+
+        const model =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+        scene.add(model);
+
+
+        /* TAMANHO */
+
+        geometry.computeBoundingBox();
+
+        const size =
+            new THREE.Vector3();
+
+        geometry.boundingBox.getSize(size);
+
+        const maxDim =
+            Math.max(
+                size.x,
+                size.y,
+                size.z
+            );
+
+
+        /* CÂMERA */
+
+        camera.position.set(
+            0,
+            0,
+            maxDim * 2.0
+        );
+
+        camera.near =
+            maxDim / 100;
+
+        camera.far =
+            maxDim * 100;
+
+        camera.updateProjectionMatrix();
+
+        camera.lookAt(0, 0, 0);
+
+
+        /* POSIÇÃO INICIAL */
+
+        model.rotation.x =
+            THREE.MathUtils.degToRad(-10);
+
+
+        /* ROTAÇÃO AUTOMÁTICA */
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+
+            model.rotation.y += 0.005;
+
+            renderer.render(
+                scene,
+                camera
+            );
+
+        }
+
+        animate();
+
+    },
+
+    undefined,
+
+    function(error) {
+
+        console.error(
+            'Erro ao carregar STL:',
+            error
+        );
+
+    }
+
+);
+
+
+/* RESPONSIVO */
+
+window.addEventListener(
+    'resize',
+    function() {
+
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+    }
+);
 
 </script>
 
